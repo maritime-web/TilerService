@@ -1,0 +1,5 @@
+spring.main.sources: dk.dma.enav.integrations.TilerServiceRouter
+
+server.port: 9081
+
+tiles.maxConcurrentJobs: 1
