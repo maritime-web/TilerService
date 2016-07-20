@@ -77,6 +77,12 @@
             <version>${apache.camel-version}</version>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
     </dependencies>
 
     <build>
