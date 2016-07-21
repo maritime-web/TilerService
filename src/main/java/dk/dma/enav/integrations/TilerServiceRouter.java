@@ -13,8 +13,6 @@ import org.apache.camel.spring.boot.FatJarRouter;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
-import javax.inject.Inject;
-
 /**
  * Created by Oliver Steensen-Bech Haagh on 18-07-16.
  */
@@ -25,6 +23,9 @@ public class TilerServiceRouter extends FatJarRouter {
 
     @PropertyInject("tiles.localDirectory")
     private String localDir;
+
+    @PropertyInject("mapTiler.license")
+    private String mapTilerLicense;
 
     @Override
     public void configure() {
@@ -44,12 +45,21 @@ public class TilerServiceRouter extends FatJarRouter {
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
                     CreateContainerResponse container = docker.createContainerCmd("klokantech/maptiler")
-                            .withCmd("maptiler", String.format("-o %s -nodata 0 0 0 -zoom 3 12 -P 4 %s", fileName, fileName))
+                            .withEnv(String.format("MAPTILER_LICENSE=%s", mapTilerLicense))
+                            .withCmd("maptiler", "-o",
+                                    fileName.replace(".jpg", ""), "-nodata", "0", "0", "0", "-zoom", "3", "12",
+                                    "-P", "4", fileName)
                             .withBinds(new Bind(localDir, new Volume("/data")))
                             .exec();
                     docker.startContainerCmd(container.getId()).exec();
-                    docker.waitContainerCmd(container.getId()).exec(new WaitContainerResultCallback());
-                    docker.removeContainerCmd(container.getId());
+                    int exitCode = docker.waitContainerCmd(container.getId()).exec(new WaitContainerResultCallback())
+                            .awaitStatusCode();
+                    if (exitCode == 0) {
+                        log.info("Tiling completed");
+                    } else {
+                        log.error("Tiling failed");
+                    }
+                    docker.removeContainerCmd(container.getId()).exec();
                 });
     }
 
