@@ -13,6 +13,9 @@ import org.apache.camel.spring.boot.FatJarRouter;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Created by Oliver Steensen-Bech Haagh on 18-07-16.
  */
@@ -27,6 +30,9 @@ public class TilerServiceRouter extends FatJarRouter {
     @PropertyInject("mapTiler.license")
     private String mapTilerLicense;
 
+    @PropertyInject("mapTiler.arguments")
+    private String mapTilerArguments;
+
     @Override
     public void configure() {
         log.info("" + docker.infoCmd().exec());
@@ -37,32 +43,47 @@ public class TilerServiceRouter extends FatJarRouter {
                     log.error("Exchange failed for: " + exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY));
                 });
 
+        // fetch satellite images from provider and save them in a local directory
         from("ftp://{{tiles.user}}@{{tiles.server}}{{tiles.directory}}?password={{tiles.password}}&passiveMode=true" +
                 "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m")
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
 
-        from("file://{{tiles.localDirectory}}?filter=#correctExtension")
+        // send local satellite images to a MapTiler running in a Docker container
+        from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true&noop=true" +
+                "&delay=15m")
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
+                    List<String> arguments = new ArrayList<>();
+                    arguments.add("maptiler");
+                    arguments.add("-o");
+                    arguments.add("tiles/" + fileName.replace(".jpg", "").replace(".tif", ""));
+                    for (String arg: mapTilerArguments.split(" ")) {
+                        arguments.add(arg);
+                    }
+                    arguments.add(fileName);
                     CreateContainerResponse container = docker.createContainerCmd("klokantech/maptiler")
                             .withEnv(String.format("MAPTILER_LICENSE=%s", mapTilerLicense))
-                            .withCmd("maptiler", "-o",
-                                    fileName.replace(".jpg", ""), "-nodata", "0", "0", "0", "-zoom", "3", "12",
-                                    "-P", "4", fileName)
+                            .withCmd(arguments)
                             .withBinds(new Bind(localDir, new Volume("/data")))
                             .exec();
-                    docker.startContainerCmd(container.getId()).exec();
-                    int exitCode = docker.waitContainerCmd(container.getId()).exec(new WaitContainerResultCallback())
+                    log.info("Starting tiling of file " + fileName);
+                    String containerID = container.getId();
+                    // display information about the created container
+                    //log.info("" + docker.inspectContainerCmd(containerID).exec());
+                    docker.startContainerCmd(containerID).exec();
+                    // get the exit code when the container finishes and check if the tiling job was successful or not
+                    int exitCode = docker.waitContainerCmd(containerID).exec(new WaitContainerResultCallback())
                             .awaitStatusCode();
                     if (exitCode == 0) {
-                        log.info("Tiling completed");
+                        log.info("Tiling completed for " + fileName);
+                        docker.removeContainerCmd(containerID).exec();
                     } else {
-                        log.error("Tiling failed");
+                        log.error("Tiling failed for " + fileName + " in container " + containerID);
                     }
-                    docker.removeContainerCmd(container.getId()).exec();
                 });
     }
 
+    // A filter for the file consumer to only consume .jpg or .tif files
     @Bean
     GenericFileFilter correctExtension() {
         return file -> {
@@ -70,4 +91,5 @@ public class TilerServiceRouter extends FatJarRouter {
             return fileName.endsWith(".tif") || fileName.endsWith(".jpg");
         };
     }
+
 }
