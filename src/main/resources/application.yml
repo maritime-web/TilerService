@@ -3,3 +3,7 @@ spring.main.sources: dk.dma.enav.integrations.TilerServiceRouter
 server.port: 9081
 
 tiles.maxConcurrentJobs: 1
+
+tiles.daysToKeep: -1
+
+user.id: 1000
