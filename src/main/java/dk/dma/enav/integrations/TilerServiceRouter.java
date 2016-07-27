@@ -24,6 +24,7 @@ import org.apache.camel.Exchange;
 import org.apache.camel.PropertyInject;
 import org.apache.camel.component.file.GenericFileFilter;
 import org.apache.camel.spring.boot.FatJarRouter;
+import org.apache.commons.net.ftp.FTPClient;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
@@ -60,11 +61,19 @@ public class TilerServiceRouter extends FatJarRouter {
     @PropertyInject("user.id")
     private String userID;
 
+    @PropertyInject("tracing")
+    private boolean tracing;
+
+    @Bean
+    FTPClient ftp() {
+        return new FTPClient();
+    }
+
     @Override
     public void configure() {
         log.info("" + docker.infoCmd().exec());
         // set true for detailed tracing of routes
-        this.getContext().setTracing(true);
+        this.getContext().setTracing(tracing);
         this.onException(Exception.class)
                 .maximumRedeliveries(6)
                 .process(exchange -> {
@@ -74,7 +83,8 @@ public class TilerServiceRouter extends FatJarRouter {
 
         // fetch satellite images from provider and save them in a local directory
         from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
-                "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m")
+                "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m" +
+                "ftpClient=#ftp")
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
 
         // send local satellite images to a MapTiler running in a Docker container
@@ -111,6 +121,7 @@ public class TilerServiceRouter extends FatJarRouter {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
                     }
                 })
+                // send auxiliary files to the .done directory
                 .process(exchange -> {
                     String fileNameWithoutExtension = ((String) exchange.getIn().getHeader(Exchange.FILE_NAME))
                             .replace(".jpg", "").replace(".tif", "");
@@ -126,14 +137,15 @@ public class TilerServiceRouter extends FatJarRouter {
                     }
                 });
 
-        // delete files that are older than the specified number of days
-        from("file://{{tiles.localDirectory}}?filter=#tooOld&recursive=true&delete=true&delay=12h")
+        /*// delete files that are older than the specified number of days
+        from("file://{{tiles.localDirectory}}?filter=#tooOld&recursive=true&delete=true&delay=12h" +
+                "&consumer.bridgeErrorHandler=true")
                 .process(exchange -> {
                     //log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " deleted");
-                });
+                });*/
 
         //from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&filter=#tooOldOnServer" +
-        //        "&delete=true");
+        //        "&delete=true&consumer.bridgeErrorHandler=true");
     }
 
     // A filter for the file consumer to only consume .jpg or .tif files
@@ -159,27 +171,6 @@ public class TilerServiceRouter extends FatJarRouter {
                 long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
 
                 if (days > daysToKeep) {
-                    return true;
-                }
-            }
-            return false;
-        };
-    }
-
-    @Bean
-    GenericFileFilter tooOldOnServer() {
-        return file -> {
-            if (daysToKeepOnServer == -1) return false;
-            else {
-                long fileLastModified = file.getLastModified();
-
-                // the difference in milliseconds for the time now
-                // and the time that the file was last modified
-                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
-                // converts the difference to days
-                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
-
-                if (days > daysToKeepOnServer) {
                     return true;
                 }
             }
