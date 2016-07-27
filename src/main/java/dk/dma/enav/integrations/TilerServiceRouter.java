@@ -25,6 +25,7 @@ import org.apache.camel.PropertyInject;
 import org.apache.camel.component.file.GenericFileFilter;
 import org.apache.camel.spring.boot.FatJarRouter;
 import org.apache.commons.net.ftp.FTPClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
@@ -69,6 +70,9 @@ public class TilerServiceRouter extends FatJarRouter {
         return new FTPClient();
     }
 
+    @Autowired
+    private FTPClient ftp;
+
     @Override
     public void configure() {
         log.info("" + docker.infoCmd().exec());
@@ -84,7 +88,7 @@ public class TilerServiceRouter extends FatJarRouter {
         // fetch satellite images from provider and save them in a local directory
         from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
                 "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m" +
-                "ftpClient=#ftp")
+                "&ftpClient=#ftp")
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
 
         // send local satellite images to a MapTiler running in a Docker container
@@ -101,11 +105,12 @@ public class TilerServiceRouter extends FatJarRouter {
                         arguments.add(arg);
                     }
                     arguments.add(fileName);
+                    // create container for MapTiler
                     CreateContainerResponse container = docker.createContainerCmd("klokantech/maptiler")
                             .withEnv(String.format("MAPTILER_LICENSE=%s", mapTilerLicense))
                             .withCmd(arguments)
                             .withBinds(new Bind(localDir, new Volume("/data")))
-                            .withUser(userID)
+                            //.withUser(userID)
                             .exec();
                     log.info("Starting tiling of file " + fileName);
                     String containerID = container.getId();
