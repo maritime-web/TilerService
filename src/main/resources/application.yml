@@ -4,6 +4,8 @@ server.port: 9081
 
 tiles.maxConcurrentJobs: 1
 
+dmi.daysToKeep: -1
+
 tiles.daysToKeep: -1
 
 user.id: 1000

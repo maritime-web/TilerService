@@ -27,9 +27,11 @@ import org.apache.camel.spring.boot.FatJarRouter;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -52,35 +54,40 @@ public class TilerServiceRouter extends FatJarRouter {
     @PropertyInject("tiles.daysToKeep")
     private int daysToKeep;
 
+    @PropertyInject("dmi.daysToKeep")
+    private int daysToKeepOnServer;
+
     @PropertyInject("user.id")
     private String userID;
 
     @Override
     public void configure() {
         log.info("" + docker.infoCmd().exec());
-        this.getContext().setTracing(false);
+        // set true for detailed tracing of routes
+        this.getContext().setTracing(true);
         this.onException(Exception.class)
                 .maximumRedeliveries(6)
                 .process(exchange -> {
                     log.error("Exchange failed for: " + exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY));
                 });
+        String[] mapTilerArgs = mapTilerArguments.split(" ");
 
         // fetch satellite images from provider and save them in a local directory
-        from("ftp://{{tiles.user}}@{{tiles.server}}{{tiles.directory}}?password={{tiles.password}}&passiveMode=true" +
+        from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
                 "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m")
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
 
         // send local satellite images to a MapTiler running in a Docker container
-        from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true&noop=true" +
-                "&delay=15m&initialDelay=10000")
+        from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true" +
+                "&delay=15m&initialDelay=10000&move=.done")
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
                     // build a list of arguments for the MapTiler
-                    List<String> arguments = new ArrayList<>();
+                    ArrayList<String> arguments = new ArrayList<>();
                     arguments.add("maptiler");
                     arguments.add("-o");
                     arguments.add("tiles/" + fileName.replace(".jpg", "").replace(".tif", ""));
-                    for (String arg: mapTilerArguments.split(" ")) {
+                    for (String arg: mapTilerArgs) {
                         arguments.add(arg);
                     }
                     arguments.add(fileName);
@@ -103,6 +110,20 @@ public class TilerServiceRouter extends FatJarRouter {
                     } else {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
                     }
+                })
+                .process(exchange -> {
+                    String fileNameWithoutExtension = ((String) exchange.getIn().getHeader(Exchange.FILE_NAME))
+                            .replace(".jpg", "").replace(".tif", "");
+                    File path = new File(localDir);
+                    File newPath = new File(path, ".done");
+
+                    File[] files = path.listFiles(file -> file.getName().contains(fileNameWithoutExtension) &&
+                            !file.equals(new File((String) exchange.getIn().getHeader(Exchange.FILE_PATH))));
+
+                    for (File file : files) {
+                        File newFile = new File(newPath, file.getName());
+                        Files.move(file.toPath(), newFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+                    }
                 });
 
         // delete files that are older than the specified number of days
@@ -110,6 +131,9 @@ public class TilerServiceRouter extends FatJarRouter {
                 .process(exchange -> {
                     //log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " deleted");
                 });
+
+        //from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&filter=#tooOldOnServer" +
+        //        "&delete=true");
     }
 
     // A filter for the file consumer to only consume .jpg or .tif files
@@ -117,7 +141,7 @@ public class TilerServiceRouter extends FatJarRouter {
     GenericFileFilter correctExtension() {
         return file -> {
             String fileName = file.getFileNameOnly();
-            return fileName.endsWith(".tif") || fileName.endsWith(".jpg");
+            return (fileName.endsWith(".tif") || fileName.endsWith(".jpg"));
         };
     }
 
@@ -142,4 +166,24 @@ public class TilerServiceRouter extends FatJarRouter {
         };
     }
 
+    @Bean
+    GenericFileFilter tooOldOnServer() {
+        return file -> {
+            if (daysToKeepOnServer == -1) return false;
+            else {
+                long fileLastModified = file.getLastModified();
+
+                // the difference in milliseconds for the time now
+                // and the time that the file was last modified
+                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
+                // converts the difference to days
+                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+
+                if (days > daysToKeepOnServer) {
+                    return true;
+                }
+            }
+            return false;
+        };
+    }
 }
