@@ -14,12 +14,14 @@
  */
 package dk.dma.enav.integrations;
 
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.CreateContainerResponse;
-import com.github.dockerjava.api.model.Bind;
-import com.github.dockerjava.api.model.Volume;
-import com.github.dockerjava.core.DockerClientBuilder;
-import com.github.dockerjava.core.command.WaitContainerResultCallback;
+
+import com.spotify.docker.client.DefaultDockerClient;
+import com.spotify.docker.client.DockerClient;
+import com.spotify.docker.client.exceptions.DockerCertificateException;
+import com.spotify.docker.client.exceptions.DockerException;
+import com.spotify.docker.client.messages.ContainerConfig;
+import com.spotify.docker.client.messages.ContainerCreation;
+import com.spotify.docker.client.messages.HostConfig;
 import org.apache.camel.Exchange;
 import org.apache.camel.PropertyInject;
 import org.apache.camel.component.file.GenericFileFilter;
@@ -42,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 @SpringBootApplication
 public class TilerServiceRouter extends FatJarRouter {
 
-    private DockerClient docker = DockerClientBuilder.getInstance().build();
+    private final DockerClient docker = DefaultDockerClient.fromEnv().build();
 
     @PropertyInject("tiles.localDirectory")
     private String localDir;
@@ -65,30 +67,33 @@ public class TilerServiceRouter extends FatJarRouter {
     @PropertyInject("tracing")
     private boolean tracing;
 
-    @Bean
-    FTPClient ftp() {
-        return new FTPClient();
+    public TilerServiceRouter() throws DockerCertificateException {
     }
+
+    @Bean
+    FTPClient ftp() { return new FTPClient(); }
 
     @Autowired
     private FTPClient ftp;
 
     @Override
-    public void configure() {
-        log.info("" + docker.infoCmd().exec());
+    public void configure() throws DockerException, InterruptedException {
+        log.info("" + docker.info());
         // set true for detailed tracing of routes
         this.getContext().setTracing(tracing);
         this.onException(Exception.class)
                 .maximumRedeliveries(6)
-                .process(exchange -> {
-                    log.error("Exchange failed for: " + exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY));
-                });
+                .process(exchange -> log.error("Exchange failed for: " +
+                        exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY)));
         String[] mapTilerArgs = mapTilerArguments.split(" ");
 
         // fetch satellite images from provider and save them in a local directory
         from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
                 "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m" +
                 "&ftpClient=#ftp")
+                .process(exchange -> {
+                    // put ftp side cleanup logic here
+                })
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
 
         // send local satellite images to a MapTiler running in a Docker container
@@ -106,22 +111,23 @@ public class TilerServiceRouter extends FatJarRouter {
                     }
                     arguments.add(fileName);
                     // create container for MapTiler
-                    CreateContainerResponse container = docker.createContainerCmd("klokantech/maptiler")
-                            .withEnv(String.format("MAPTILER_LICENSE=%s", mapTilerLicense))
-                            .withCmd(arguments)
-                            .withBinds(new Bind(localDir, new Volume("/data")))
-                            //.withUser(userID)
-                            .exec();
+                    ContainerConfig config = ContainerConfig.builder()
+                            .hostConfig(HostConfig.builder()
+                                    .appendBinds(String.format("%s:/data", localDir)).build())
+                            .image("klokantech/maptiler")
+                            .env(String.format("MAPTILER_LICENSE=%s", mapTilerLicense))
+                            .cmd(arguments)
+                            .build();
+                    ContainerCreation container = docker.createContainer(config);
                     log.info("Starting tiling of file " + fileName);
-                    String containerID = container.getId();
+                    String containerID = container.id();
                     //log.info("" + docker.inspectContainerCmd(containerID).exec());
-                    docker.startContainerCmd(containerID).exec();
+                    docker.startContainer(containerID);
                     // get the exit code when the container finishes and check if the tiling job was successful or not
-                    int exitCode = docker.waitContainerCmd(containerID).exec(new WaitContainerResultCallback())
-                            .awaitStatusCode();
+                    int exitCode = docker.waitContainer(containerID).statusCode();
                     if (exitCode == 0) {
                         log.info("Tiling completed for " + fileName);
-                        docker.removeContainerCmd(containerID).exec();
+                        docker.removeContainer(containerID);
                     } else {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
                     }
@@ -165,7 +171,7 @@ public class TilerServiceRouter extends FatJarRouter {
     @Bean
     GenericFileFilter tooOld() {
         return file -> {
-            if (daysToKeep == -1) return false;
+            if (daysToKeep <= -1) return false;
             else {
                 long fileLastModified = file.getLastModified();
 
