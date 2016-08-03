@@ -88,7 +88,7 @@ public class TilerServiceRouter extends FatJarRouter {
         String[] mapTilerArgs = mapTilerArguments.split(" ");
 
         // fetch satellite images from provider and save them in a local directory
-        from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
+        from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
                 "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m" +
                 "&ftpClient=#ftp")
                 .process(exchange -> {
@@ -101,11 +101,15 @@ public class TilerServiceRouter extends FatJarRouter {
                 "&delay=15m&initialDelay=10000&move=.done")
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
+                    String fileNameWithoutExtension = fileName.replace(".jpg", "").replace(".tif", "");
+                    // create the new path before docker does it and takes ownership
+                    File dir = new File(localDir + "/tiles/" + fileNameWithoutExtension);
+                    dir.mkdir();
                     // build a list of arguments for the MapTiler
                     ArrayList<String> arguments = new ArrayList<>();
                     arguments.add("maptiler");
                     arguments.add("-o");
-                    arguments.add("tiles/" + fileName.replace(".jpg", "").replace(".tif", ""));
+                    arguments.add("tiles/" + fileNameWithoutExtension);
                     for (String arg: mapTilerArgs) {
                         arguments.add(arg);
                     }
@@ -132,7 +136,7 @@ public class TilerServiceRouter extends FatJarRouter {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
                     }
                 })
-                // send auxiliary files to the .done directory
+                // send auxiliary files to the .done directory when map tiling has finished
                 .process(exchange -> {
                     String fileNameWithoutExtension = ((String) exchange.getIn().getHeader(Exchange.FILE_NAME))
                             .replace(".jpg", "").replace(".tif", "");
@@ -148,15 +152,10 @@ public class TilerServiceRouter extends FatJarRouter {
                     }
                 });
 
-        /*// delete files that are older than the specified number of days
-        from("file://{{tiles.localDirectory}}?filter=#tooOld&recursive=true&delete=true&delay=12h" +
-                "&consumer.bridgeErrorHandler=true")
-                .process(exchange -> {
-                    //log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " deleted");
-                });*/
-
-        //from("ftp://{{dmi.user}}@{{dmi.server}}{{dmi.directory}}?password={{dmi.password}}&filter=#tooOldOnServer" +
-        //        "&delete=true&consumer.bridgeErrorHandler=true");
+        // remove old files from .done directory
+        from("file://{{tiles.localDirectory}}/.done?filter=#tooOld&delete=true&delay=12h" +
+                "consumer.bridgeErrorHandler=true")
+                .process(exchange -> log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " deleted"));
     }
 
     // A filter for the file consumer to only consume .jpg or .tif files
@@ -171,7 +170,7 @@ public class TilerServiceRouter extends FatJarRouter {
     @Bean
     GenericFileFilter tooOld() {
         return file -> {
-            if (daysToKeep <= -1) return false;
+            if (daysToKeep < 0) return false;
             else {
                 long fileLastModified = file.getLastModified();
 
