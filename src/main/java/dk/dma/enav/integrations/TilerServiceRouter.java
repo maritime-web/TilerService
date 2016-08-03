@@ -26,12 +26,12 @@ import org.apache.camel.Exchange;
 import org.apache.camel.PropertyInject;
 import org.apache.camel.component.file.GenericFileFilter;
 import org.apache.camel.spring.boot.FatJarRouter;
-import org.apache.commons.net.ftp.FTPClient;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.commons.io.FileUtils;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -70,12 +70,6 @@ public class TilerServiceRouter extends FatJarRouter {
     public TilerServiceRouter() throws DockerCertificateException {
     }
 
-    @Bean
-    FTPClient ftp() { return new FTPClient(); }
-
-    @Autowired
-    private FTPClient ftp;
-
     @Override
     public void configure() throws DockerException, InterruptedException {
         log.info("" + docker.info());
@@ -90,10 +84,7 @@ public class TilerServiceRouter extends FatJarRouter {
         // fetch satellite images from provider and save them in a local directory
         from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
                 "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m" +
-                "&ftpClient=#ftp")
-                .process(exchange -> {
-                    // put ftp side cleanup logic here
-                })
+                "&filter=#notTooOld")
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
 
         // send local satellite images to a MapTiler running in a Docker container
@@ -102,9 +93,11 @@ public class TilerServiceRouter extends FatJarRouter {
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
                     String fileNameWithoutExtension = fileName.replace(".jpg", "").replace(".tif", "");
+
                     // create the new path before docker does it and takes ownership
                     File dir = new File(localDir + "/tiles/" + fileNameWithoutExtension);
                     dir.mkdir();
+
                     // build a list of arguments for the MapTiler
                     ArrayList<String> arguments = new ArrayList<>();
                     arguments.add("maptiler");
@@ -114,6 +107,7 @@ public class TilerServiceRouter extends FatJarRouter {
                         arguments.add(arg);
                     }
                     arguments.add(fileName);
+
                     // create container for MapTiler
                     ContainerConfig config = ContainerConfig.builder()
                             .hostConfig(HostConfig.builder()
@@ -123,15 +117,36 @@ public class TilerServiceRouter extends FatJarRouter {
                             .cmd(arguments)
                             .build();
                     ContainerCreation container = docker.createContainer(config);
+
                     log.info("Starting tiling of file " + fileName);
                     String containerID = container.id();
                     //log.info("" + docker.inspectContainerCmd(containerID).exec());
                     docker.startContainer(containerID);
+
                     // get the exit code when the container finishes and check if the tiling job was successful or not
                     int exitCode = docker.waitContainer(containerID).statusCode();
+
                     if (exitCode == 0) {
                         log.info("Tiling completed for " + fileName);
                         docker.removeContainer(containerID);
+
+                        // Set permissions for the newly generated directory
+                        ContainerConfig fixerConfig = ContainerConfig.builder()
+                                .hostConfig(HostConfig.builder()
+                                    .appendBinds(String.format("%s/tiles/%s:/data", localDir, fileNameWithoutExtension))
+                                        .build())
+                                .image("dmadk/permissions-fixer").build();
+                        ContainerCreation fixer = docker.createContainer(fixerConfig);
+                        String fixerID = fixer.id();
+                        docker.startContainer(fixerID);
+
+                        int fixerExitCode = docker.waitContainer(fixerID).statusCode();
+
+                        if (fixerExitCode != 0) {
+                            log.error("Setting permissions for " + fileNameWithoutExtension + " failed");
+                        } else {
+                            docker.removeContainer(fixerID);
+                        }
                     } else {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
                     }
@@ -153,9 +168,14 @@ public class TilerServiceRouter extends FatJarRouter {
                 });
 
         // remove old files from .done directory
-        from("file://{{tiles.localDirectory}}/.done?filter=#tooOld&delete=true&delay=12h" +
+        from("file://{{tiles.localDirectory}}/.done?filter=#tooOld&delete=true&delay=6h" +
                 "consumer.bridgeErrorHandler=true")
-                .process(exchange -> log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " deleted"));
+                .process(exchange -> log.info("Old images deleter: " + exchange.getIn().getHeader(Exchange.FILE_NAME)
+                        + " was deleted"));
+
+        // remove old tiles from the tiles directory
+        from("timer:tileDeleteTimer?period=6h&fixedRate=true")
+                .process(exchange -> deleteOldTiles());
     }
 
     // A filter for the file consumer to only consume .jpg or .tif files
@@ -186,5 +206,51 @@ public class TilerServiceRouter extends FatJarRouter {
             }
             return false;
         };
+    }
+
+    @Bean
+    GenericFileFilter notTooOld() {
+        return file -> {
+            if (daysToKeep < 0) return true;
+            else {
+                long fileLastModified = file.getLastModified();
+
+                // the difference in milliseconds for the time now
+                // and the time that the file was last modified
+                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
+                // converts the difference to days
+                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+
+                if (days <= daysToKeep) {
+                    return true;
+                }
+                return false;
+            }
+        };
+    }
+
+    private void deleteOldTiles() throws IOException {
+        if (daysToKeep < 0) {
+            return;
+        } else {
+            File path = new File(localDir + "/tiles");
+            // get all directories that are older than daysToKeep
+            File[] subPaths = path.listFiles(file -> {
+                long fileLastModified = file.lastModified();
+
+                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
+                // converts the difference to days
+                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+
+                if (days > daysToKeep) {
+                    return true;
+                }
+                return false;
+            });
+            for (File file : subPaths) {
+                FileUtils.deleteDirectory(file);
+                log.info("Old tiles deleter: " + file.getName() + " was deleted");
+            }
+        }
     }
 }
