@@ -38,6 +38,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -78,7 +79,7 @@ public class TilerServiceRouter extends FatJarRouter {
                 .maximumRedeliveries(6)
                 .process(exchange -> log.error("Exchange failed for: " +
                         exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY)));
-        // split the specified arguments for the maptiler container
+        // split the specified arguments for the MapTiler container
         String[] mapTilerArgs = mapTilerArguments.split(" ");
 
         // fetch satellite images from provider and save them in a local directory
@@ -86,6 +87,10 @@ public class TilerServiceRouter extends FatJarRouter {
                 "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m" +
                 "&filter=#notTooOld")
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
+
+        from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&consumer.bridgeErrorHandler=true" +
+                "&download=false&delete=true&filter=#tooOldOnFTP")
+                .process(exchange -> log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " was deleted on FTP server"));
 
         // send local satellite images to a MapTiler running in a Docker container
         from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true" +
@@ -99,9 +104,7 @@ public class TilerServiceRouter extends FatJarRouter {
                     arguments.add("maptiler");
                     arguments.add("-o");
                     arguments.add("tiles/" + fileNameWithoutExtension);
-                    for (String arg: mapTilerArgs) {
-                        arguments.add(arg);
-                    }
+                    Collections.addAll(arguments, mapTilerArgs);
                     arguments.add(fileName);
 
                     // create container for MapTiler
@@ -191,10 +194,26 @@ public class TilerServiceRouter extends FatJarRouter {
                 // converts the difference to days
                 long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
 
-                if (days <= daysToKeep) {
-                    return true;
-                }
-                return false;
+                return days <= daysToKeep;
+            }
+        };
+    }
+
+    // filter for files that are too old on FTP server
+    @Bean
+    GenericFileFilter tooOldOnFTP() {
+        return file -> {
+            if (daysToKeepOnServer < 0) return false;
+            else {
+                long fileLastModified = file.getLastModified();
+
+                // the difference in milliseconds for the time now
+                // and the time that the file was last modified
+                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
+                // converts the difference to days
+                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+
+                return days > daysToKeepOnServer;
             }
         };
     }
@@ -215,10 +234,7 @@ public class TilerServiceRouter extends FatJarRouter {
                 // converts the difference to days
                 long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
 
-                if (days > daysToKeep) {
-                    return true;
-                }
-                return false;
+                return days > daysToKeep;
             };
 
             File[] tileSubPaths = tilesPath.listFiles(filter);

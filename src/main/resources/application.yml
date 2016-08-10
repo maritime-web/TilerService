@@ -11,3 +11,17 @@ tiles.daysToKeep: -1
 tracing: true
 
 mapTiler.arguments:
+
+---
+spring:
+  profiles: unittest
+
+dmi.server: 127.0.0.1
+
+dmi.user: user
+
+dmi.password: password
+
+dmi.daysToKeep: 10
+
+tiles.daysToKeep: 5
