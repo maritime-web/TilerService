@@ -9,3 +9,5 @@ dmi.daysToKeep: -1
 tiles.daysToKeep: -1
 
 tracing: true
+
+mapTiler.arguments:
