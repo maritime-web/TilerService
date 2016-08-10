@@ -78,6 +78,7 @@ public class TilerServiceRouter extends FatJarRouter {
                 .maximumRedeliveries(6)
                 .process(exchange -> log.error("Exchange failed for: " +
                         exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY)));
+        // split the specified arguments for the maptiler container
         String[] mapTilerArgs = mapTilerArguments.split(" ");
 
         // fetch satellite images from provider and save them in a local directory
@@ -92,10 +93,6 @@ public class TilerServiceRouter extends FatJarRouter {
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
                     String fileNameWithoutExtension = fileName.replace(".jpg", "").replace(".tif", "");
-
-                    // create the new path before docker does it and takes ownership
-                    File dir = new File(localDir + "/tiles/" + fileNameWithoutExtension);
-                    dir.mkdir();
 
                     // build a list of arguments for the MapTiler
                     ArrayList<String> arguments = new ArrayList<>();
@@ -180,27 +177,6 @@ public class TilerServiceRouter extends FatJarRouter {
         };
     }
 
-    @Bean
-    GenericFileFilter tooOld() {
-        return file -> {
-            if (daysToKeep < 0) return false;
-            else {
-                long fileLastModified = file.getLastModified();
-
-                // the difference in milliseconds for the time now
-                // and the time that the file was last modified
-                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
-                // converts the difference to days
-                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
-
-                if (days > daysToKeep) {
-                    return true;
-                }
-            }
-            return false;
-        };
-    }
-
     // filter for not consuming old files from ftp server
     @Bean
     GenericFileFilter notTooOld() {
@@ -230,6 +206,7 @@ public class TilerServiceRouter extends FatJarRouter {
         } else {
             File tilesPath = new File(localDir + "/tiles");
             File donePath = new File(localDir + "/.done");
+
             // get all directories that are older than daysToKeep
             FileFilter filter = file -> {
                 long fileLastModified = file.lastModified();
@@ -243,9 +220,11 @@ public class TilerServiceRouter extends FatJarRouter {
                 }
                 return false;
             };
+
             File[] tileSubPaths = tilesPath.listFiles(filter);
             File[] doneFiles = donePath.listFiles(filter);
             File[] allToDelete = (File[]) ArrayUtils.addAll(tileSubPaths, doneFiles);
+
             for (File file : allToDelete) {
                 FileUtils.deleteDirectory(file);
                 log.info("Old tiles and images deleter: " + file.getName() + " was deleted");
