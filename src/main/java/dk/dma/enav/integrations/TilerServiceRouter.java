@@ -27,10 +27,12 @@ import org.apache.camel.PropertyInject;
 import org.apache.camel.component.file.GenericFileFilter;
 import org.apache.camel.spring.boot.FatJarRouter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.ArrayUtils;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -60,9 +62,6 @@ public class TilerServiceRouter extends FatJarRouter {
 
     @PropertyInject("dmi.daysToKeep")
     private int daysToKeepOnServer;
-
-    @PropertyInject("user.id")
-    private String userID;
 
     @PropertyInject("tracing")
     private boolean tracing;
@@ -167,15 +166,9 @@ public class TilerServiceRouter extends FatJarRouter {
                     }
                 });
 
-        // remove old files from .done directory
-        from("file://{{tiles.localDirectory}}/.done?filter=#tooOld&delete=true&delay=6h" +
-                "consumer.bridgeErrorHandler=true")
-                .process(exchange -> log.info("Old images deleter: " + exchange.getIn().getHeader(Exchange.FILE_NAME)
-                        + " was deleted"));
-
         // remove old tiles from the tiles directory
-        from("timer:tileDeleteTimer?period=6h&fixedRate=true")
-                .process(exchange -> deleteOldTiles());
+        from("timer:deleteOldFiledTimer?period=6h&fixedRate=true")
+                .process(exchange -> deleteOldTilesAndImages());
     }
 
     // A filter for the file consumer to only consume .jpg or .tif files
@@ -208,6 +201,7 @@ public class TilerServiceRouter extends FatJarRouter {
         };
     }
 
+    // filter for not consuming old files from ftp server
     @Bean
     GenericFileFilter notTooOld() {
         return file -> {
@@ -229,13 +223,15 @@ public class TilerServiceRouter extends FatJarRouter {
         };
     }
 
-    private void deleteOldTiles() throws IOException {
+    // deletes tiles and images that are older than the specified threshold
+    private void deleteOldTilesAndImages() throws IOException {
         if (daysToKeep < 0) {
             return;
         } else {
-            File path = new File(localDir + "/tiles");
+            File tilesPath = new File(localDir + "/tiles");
+            File donePath = new File(localDir + "/.done");
             // get all directories that are older than daysToKeep
-            File[] subPaths = path.listFiles(file -> {
+            FileFilter filter = file -> {
                 long fileLastModified = file.lastModified();
 
                 long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
@@ -246,10 +242,13 @@ public class TilerServiceRouter extends FatJarRouter {
                     return true;
                 }
                 return false;
-            });
-            for (File file : subPaths) {
+            };
+            File[] tileSubPaths = tilesPath.listFiles(filter);
+            File[] doneFiles = donePath.listFiles(filter);
+            File[] allToDelete = (File[]) ArrayUtils.addAll(tileSubPaths, doneFiles);
+            for (File file : allToDelete) {
                 FileUtils.deleteDirectory(file);
-                log.info("Old tiles deleter: " + file.getName() + " was deleted");
+                log.info("Old tiles and images deleter: " + file.getName() + " was deleted");
             }
         }
     }

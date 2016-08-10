@@ -8,6 +8,4 @@ dmi.daysToKeep: -1
 
 tiles.daysToKeep: -1
 
-user.id: 1000
-
 tracing: true
