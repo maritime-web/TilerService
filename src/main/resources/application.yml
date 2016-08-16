@@ -18,10 +18,12 @@ spring:
 
 dmi.server: 127.0.0.1
 
+dmi.directory:
+
 dmi.user: user
 
 dmi.password: password
 
-dmi.daysToKeep: 10
+dmi.daysToKeep: 60
 
-tiles.daysToKeep: 5
+tiles.daysToKeep: -1

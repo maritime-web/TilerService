@@ -167,7 +167,7 @@ public class TilerServiceRouter extends FatJarRouter {
                 });
 
         // remove old tiles from the tiles directory
-        from("timer:deleteOldFiledTimer?period=6h&fixedRate=true")
+        from("timer:deleteOldFilesTimer?period=6h&fixedRate=true")
                 .process(exchange -> deleteOldTilesAndImages());
     }
 
