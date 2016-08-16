@@ -19,7 +19,10 @@ import org.apache.camel.builder.AdviceWithRouteBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.model.ModelCamelContext;
 import org.apache.camel.model.ProcessorDefinition;
+import org.apache.camel.model.RouteDefinition;
 import org.apache.camel.model.ToDefinition;
+import org.apache.commons.net.ftp.FTPClient;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,12 +36,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.util.Date;
-import java.util.GregorianCalendar;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Created by Oliver Steensen-Bech Haagh on 8/10/16.
@@ -75,7 +75,7 @@ public class TilerServiceTest {
 
     @Test
     public void testFtpFilter() throws Exception {
-        context.getRouteDefinitions().forEach(consumer -> consumer.stop());
+        context.getRouteDefinitions().forEach(routeDefinition -> routeDefinition.stop());
         context.getRouteDefinitions().get(0).adviceWith(context, new AdviceWithRouteBuilder() {
             @Override
             public void configure() throws Exception {
@@ -89,13 +89,14 @@ public class TilerServiceTest {
         end.assertIsSatisfied();
 
         String fileName = (String) end.getReceivedExchanges().get(0).getIn().getHeader(Exchange.FILE_NAME);
-        assertEquals(fileName, "image1.jpg");
+        assertEquals("image1.jpg", fileName);
     }
 
     @Test
     public void testTooOldFtp() throws Exception {
-        context.getRouteDefinitions().forEach(consumer -> consumer.stop());
-        context.getRouteDefinitions().get(1).adviceWith(context, new AdviceWithRouteBuilder() {
+        context.getRouteDefinitions().forEach(routeDefinition -> routeDefinition.stop());
+        RouteDefinition route = context.getRouteDefinitions().get(1);
+        route.adviceWith(context, new AdviceWithRouteBuilder() {
             @Override
             public void configure() throws Exception {
                 replaceFromWith("ftp://user@127.0.0.1:" + serverPort + "?password=password&filter=#tooOldOnFTP&delete=true");
@@ -108,7 +109,22 @@ public class TilerServiceTest {
         end.assertIsSatisfied();
 
         String fileName = (String) end.getReceivedExchanges().get(0).getIn().getHeader(Exchange.FILE_NAME);
-        assertEquals(fileName, "image2.jpg");
+        assertEquals("image2.jpg", fileName);
+
+        FTPClient ftpClient = new FTPClient();
+        ftpClient.connect("localhost", serverPort);
+        ftpClient.login("user", "password");
+
+        ArrayList<String> names = new ArrayList<>(Arrays.asList(ftpClient.listNames()));
+        names.forEach(name -> System.out.println(name));
+
+        assertEquals(1, names.size());
+        assertEquals("image1.jpg", names.get(0));
+        ftpClient.disconnect();
     }
 
+    @After
+    public void tearDown() {
+        fakeFtpServer.stop();
+    }
 }
