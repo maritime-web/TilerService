@@ -207,7 +207,7 @@ public class TilerServiceRouter extends FatJarRouter {
     @Bean
     GenericFileFilter tooOldOnFTP() {
         return file -> {
-            if (daysToKeepOnServer < 0) return false;
+            if (daysToKeepOnServer <= 0) return false;
             else {
                 long fileLastModified = file.getLastModified();
 
