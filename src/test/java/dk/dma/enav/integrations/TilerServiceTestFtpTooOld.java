@@ -23,6 +23,7 @@ import org.apache.camel.model.RouteDefinition;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -32,8 +33,10 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 @RunWith(SpringJUnit4ClassRunner.class)
 @ActiveProfiles("unittest")
 @SpringBootTest(classes = TilerServiceRouter.class)
+@DirtiesContext
 public class TilerServiceTestFtpTooOld extends TilerServiceTestBase {
 
+    // test that old files on ftp are deleted
     @Test
     public void test() throws Exception {
         context.getRouteDefinitions().forEach(routeDefinition -> routeDefinition.stop());

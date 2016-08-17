@@ -17,12 +17,10 @@
 
 package dk.dma.enav.integrations;
 
-import org.apache.camel.builder.AdviceWithRouteBuilder;
-import org.apache.camel.component.mock.MockEndpoint;
+import org.apache.camel.builder.NotifyBuilder;
 import org.apache.camel.model.ModelCamelContext;
-import org.apache.camel.model.ProcessDefinition;
-import org.apache.camel.model.RouteDefinition;
 import org.apache.camel.test.junit4.CamelTestSupport;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +29,11 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Date;
+import java.util.GregorianCalendar;
+
 /**
  * Created by Oliver Steensen-Bech Haagh on 8/17/16.
  */
@@ -38,31 +41,40 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 @ActiveProfiles("unittest")
 @SpringBootTest(classes = TilerServiceRouter.class)
 @DirtiesContext
-public class TilerServiceTestFileExtension extends CamelTestSupport {
+public class TilerServiceTestDeleteOldTiles extends CamelTestSupport {
 
     @Autowired
     private ModelCamelContext context;
 
-    // test that only files with the correct extension are sent to the maptiler
-    @Test
-    public void test() throws Exception {
-        context.getRouteDefinitions().forEach(routeDefinition -> routeDefinition.stop());
-        RouteDefinition route = context.getRouteDefinitions().get(2);
-        route.adviceWith(context, new AdviceWithRouteBuilder() {
-            @Override
-            public void configure() throws Exception {
-                replaceFromWith("file://target/test-classes/tiles?filter=#correctExtension&noop=true");
-                weaveByType(ProcessDefinition.class).replace().to("test:file://target/test-classes/tilesResult?noop=true");
-            }
-        });
-        MockEndpoint.assertIsSatisfied(context);
+    private String localDir;
 
-        route.stop();
-        context.stop();
+    @Before
+    public void setUp() throws IOException {
+        localDir = "${tiles.localDirectory}";
+        context.getRouteDefinitions().forEach(routeDefinition -> routeDefinition.stop());
+
+        File notTooOld = new File(localDir + "/file1");
+        notTooOld.setLastModified(new Date().getTime());
+
+        File tooOld = new File(localDir + "/file2");
+        tooOld.setLastModified(new GregorianCalendar(2011, 9, 30).getTime().getTime());
+        context.getRouteDefinitions().forEach(routeDefinition -> routeDefinition.stop());
     }
 
-    @Override
-    public boolean isUseAdviceWith() {
-        return true;
+    // test that old local files gets deleted as they should
+    @Test
+    public void test() throws Exception {
+        NotifyBuilder notify = new NotifyBuilder(context).fromRoute(context.getRouteDefinitions().get(3).getId())
+                .whenDone(1).create();
+
+        boolean done = notify.matches();
+
+        if (done) {
+            File path = new File(localDir);
+            assertEquals(1, path.listFiles().length);
+            assertEquals("file1", path.listFiles()[0].getName());
+        }
+
+        context.stop();
     }
 }

@@ -154,6 +154,8 @@ public class TilerServiceRouter extends FatJarRouter {
                 })
                 // send auxiliary files to the .done directory when map tiling has finished
                 .process(exchange -> {
+                    // assumes that satellite images either ends with .jpg or .tif
+                    // may have to changed in the future
                     String fileNameWithoutExtension = ((String) exchange.getIn().getHeader(Exchange.FILE_NAME))
                             .replace(".jpg", "").replace(".tif", "");
                     File path = new File(localDir);

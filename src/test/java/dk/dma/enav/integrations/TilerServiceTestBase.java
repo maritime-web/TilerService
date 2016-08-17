@@ -29,14 +29,18 @@ import org.mockftpserver.fake.filesystem.FileEntry;
 import org.mockftpserver.fake.filesystem.FileSystem;
 import org.mockftpserver.fake.filesystem.UnixFakeFileSystem;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.util.Date;
 import java.util.GregorianCalendar;
 
 /**
  * Created by Oliver Steensen-Bech Haagh on 8/16/16.
+ *
+ * A base class for testing
  */
 @Ignore
+@DirtiesContext
 public abstract class TilerServiceTestBase extends CamelTestSupport {
 
     protected FakeFtpServer fakeFtpServer;
@@ -63,6 +67,7 @@ public abstract class TilerServiceTestBase extends CamelTestSupport {
         serverPort = fakeFtpServer.getServerControlPort();
     }
 
+    @DirtiesContext
     @Test
     public abstract void test() throws Exception;
 
@@ -70,6 +75,9 @@ public abstract class TilerServiceTestBase extends CamelTestSupport {
     public void tearDown() throws Exception {
         fakeFtpServer.stop();
         fakeFtpServer = null;
+
+        context.stop();
+        context = null;
     }
 
     @Override
