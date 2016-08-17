@@ -27,3 +27,5 @@ dmi.password: password
 dmi.daysToKeep: 60
 
 tiles.daysToKeep: -1
+
+tiles.localDirectory: target/test-classes/tiles
