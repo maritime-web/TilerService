@@ -54,6 +54,9 @@ public class TilerServiceRouter extends FatJarRouter {
     @PropertyInject("tiles.localDirectory")
     private String localDir;
 
+    @PropertyInject("tiles.hostDirectory")
+    private String hostDir;
+
     @PropertyInject("mapTiler.license")
     private String mapTilerLicense;
 
@@ -130,24 +133,6 @@ public class TilerServiceRouter extends FatJarRouter {
                     if (exitCode == 0) {
                         log.info("Tiling completed for " + fileName);
                         docker.removeContainer(containerID);
-
-                        // Set permissions for the newly generated directory
-                        ContainerConfig fixerConfig = ContainerConfig.builder()
-                                .hostConfig(HostConfig.builder()
-                                    .appendBinds(String.format("%s/tiles/%s:/data", localDir, fileNameWithoutExtension))
-                                        .build())
-                                .image("dmadk/permissions-fixer").build();
-                        ContainerCreation fixer = docker.createContainer(fixerConfig);
-                        String fixerID = fixer.id();
-                        docker.startContainer(fixerID);
-
-                        int fixerExitCode = docker.waitContainer(fixerID).statusCode();
-
-                        if (fixerExitCode != 0) {
-                            log.error("Setting permissions for " + fileNameWithoutExtension + " failed");
-                        } else {
-                            docker.removeContainer(fixerID);
-                        }
                     } else {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
                     }
