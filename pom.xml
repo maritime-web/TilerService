@@ -22,7 +22,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>dk.dma.enav.integrations</groupId>
-    <artifactId>tiler-service</artifactId>
+    <artifactId>tiler-service-docker</artifactId>
     <packaging>war</packaging>
     <version>1.0-SNAPSHOT</version>
 
