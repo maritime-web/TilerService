@@ -115,7 +115,7 @@ public class TilerServiceRouter extends FatJarRouter {
                     // create container for MapTiler
                     ContainerConfig config = ContainerConfig.builder()
                             .hostConfig(HostConfig.builder()
-                                    .appendBinds(String.format("%s:/data", localDir)).build())
+                                    .appendBinds(String.format("%s:/data", hostDir)).build())
                             .image("klokantech/maptiler")
                             .env(String.format("MAPTILER_LICENSE=%s", mapTilerLicense))
                             .cmd(arguments)

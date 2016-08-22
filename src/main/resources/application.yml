@@ -47,4 +47,4 @@ mapTiler.arguments:
 
 tiles.localDirectory: /data/tiles
 
-tiles.host.Directory: $HOME/data
+tiles.hostDirectory: $HOME/data
