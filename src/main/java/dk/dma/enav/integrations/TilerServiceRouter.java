@@ -36,6 +36,8 @@ import org.springframework.context.annotation.Bean;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -49,7 +51,7 @@ import java.util.concurrent.TimeUnit;
 @SpringBootApplication
 public class TilerServiceRouter extends FatJarRouter {
 
-    private final DockerClient docker = new DefaultDockerClient("unix:///var/run/docker.sock");
+    private final DockerClient docker = new DefaultDockerClient(URI.create("unix:///var/run/docker.sock"));
 
     @PropertyInject("tiles.localDirectory")
     private String localDir;
