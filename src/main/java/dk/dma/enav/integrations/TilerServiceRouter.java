@@ -49,7 +49,7 @@ import java.util.concurrent.TimeUnit;
 @SpringBootApplication
 public class TilerServiceRouter extends FatJarRouter {
 
-    private final DockerClient docker = DefaultDockerClient.fromEnv().build();
+    private final DockerClient docker = new DefaultDockerClient("unix:///var/run/docker.sock");
 
     @PropertyInject("tiles.localDirectory")
     private String localDir;
