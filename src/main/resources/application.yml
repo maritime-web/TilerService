@@ -11,8 +11,6 @@ tiles.daysToKeep: -1
 
 tracing: true
 
-mapTiler.arguments:
-
 tiles.localDirectory: /data/tiles
 
 ---
