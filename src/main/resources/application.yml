@@ -13,6 +13,8 @@ tracing: true
 
 mapTiler.arguments:
 
+tiles.localDirectory: /data/tiles
+
 ---
 spring:
   profiles: unittest
@@ -30,19 +32,3 @@ dmi.daysToKeep: 60
 tiles.daysToKeep: 10
 
 tiles.localDirectory: target/test-classes/tilesOld
-
----
-spring:
-  profiles: docker
-
-tiles.maxConcurrentJobs: 1
-
-dmi.daysToKeep: -1
-
-tiles.daysToKeep: -1
-
-tracing: true
-
-mapTiler.arguments:
-
-tiles.localDirectory: /data/tiles
