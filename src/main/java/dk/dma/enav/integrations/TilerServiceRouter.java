@@ -21,6 +21,7 @@ import com.spotify.docker.client.DefaultDockerClient;
 import com.spotify.docker.client.DockerClient;
 import com.spotify.docker.client.exceptions.DockerCertificateException;
 import com.spotify.docker.client.exceptions.DockerException;
+import com.spotify.docker.client.messages.Container;
 import com.spotify.docker.client.messages.ContainerConfig;
 import com.spotify.docker.client.messages.ContainerCreation;
 import com.spotify.docker.client.messages.HostConfig;
@@ -83,6 +84,37 @@ public class TilerServiceRouter extends FatJarRouter {
                         exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY)));
         // split the specified arguments for the MapTiler container
         String[] mapTilerArgs = mapTilerArguments.split(" ");
+
+        // create a container for tile server
+        ContainerConfig tileServerConfig = ContainerConfig.builder()
+                .hostConfig(HostConfig.builder().appendBinds(String.format("%s:/var/www", localDir)).build())
+                .image("klokantech/tileserver-php")
+                .build();
+        ContainerCreation tileServer = docker.createContainer(tileServerConfig);
+        log.info("Starting tile server");
+        String tileServerID = tileServer.id();
+        docker.startContainer(tileServerID);
+
+        // handle shutdown of tile server container on graceful shutdown
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                log.info("Stopping tile server");
+                try {
+                    docker.stopContainer(tileServerID, 300);
+                    int exitCode = docker.waitContainer(tileServerID).statusCode();
+                    if (exitCode != 0) {
+                        log.error("Something went wrong when shutting down tile server");
+                    } else {
+                        docker.removeContainer(tileServerID);
+                    }
+                } catch (DockerException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
 
         // fetch satellite images from provider and save them in a local directory
         from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
