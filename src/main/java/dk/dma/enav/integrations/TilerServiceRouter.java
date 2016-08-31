@@ -133,9 +133,9 @@ public class TilerServiceRouter extends FatJarRouter {
                 "&filter=#notTooOld")
                 .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
 
-        from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&consumer.bridgeErrorHandler=true" +
-                "&download=false&delete=true&filter=#tooOldOnFTP")
-                .process(exchange -> log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " was deleted on FTP server"));
+//        from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&consumer.bridgeErrorHandler=true" +
+//                "&download=false&delete=true&filter=#tooOldOnFTP")
+//                .process(exchange -> log.info(exchange.getIn().getHeader(Exchange.FILE_NAME) + " was deleted on FTP server"));
 
         // send local satellite images to a MapTiler running in a Docker container
         from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true" +
