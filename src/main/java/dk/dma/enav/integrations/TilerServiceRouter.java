@@ -21,10 +21,10 @@ import com.spotify.docker.client.DefaultDockerClient;
 import com.spotify.docker.client.DockerClient;
 import com.spotify.docker.client.exceptions.DockerCertificateException;
 import com.spotify.docker.client.exceptions.DockerException;
-import com.spotify.docker.client.messages.Container;
 import com.spotify.docker.client.messages.ContainerConfig;
 import com.spotify.docker.client.messages.ContainerCreation;
 import com.spotify.docker.client.messages.HostConfig;
+import com.spotify.docker.client.messages.PortBinding;
 import org.apache.camel.Exchange;
 import org.apache.camel.PropertyInject;
 import org.apache.camel.component.file.GenericFileFilter;
@@ -39,9 +39,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -60,6 +58,9 @@ public class TilerServiceRouter extends FatJarRouter {
 
     @PropertyInject("mapTiler.arguments")
     private String mapTilerArguments;
+
+    @PropertyInject("tiles.server.port")
+    private String tileServerPort;
 
     @PropertyInject("tiles.daysToKeep")
     private int daysToKeep;
@@ -86,9 +87,14 @@ public class TilerServiceRouter extends FatJarRouter {
         String[] mapTilerArgs = mapTilerArguments.split(" ");
 
         // create a container for tile server
+        Map<String, List<PortBinding>> portBindings = new HashMap<>();
+        List<PortBinding> hostPorts = new ArrayList<>();
+        hostPorts.add(PortBinding.of("", tileServerPort));
+        portBindings.put("80", hostPorts);
         ContainerConfig tileServerConfig = ContainerConfig.builder()
-                .hostConfig(HostConfig.builder().appendBinds(String.format("%s:/var/www", localDir)).build())
-                .image("klokantech/tileserver-php")
+                .hostConfig(HostConfig.builder().appendBinds(String.format("%s:/var/www", localDir + "/tiles"))
+                        .portBindings(portBindings).build())
+                .image("klokantech/tileserver-php").exposedPorts("80")
                 .build();
         ContainerCreation tileServer = docker.createContainer(tileServerConfig);
         log.info("Starting tile server");
@@ -187,7 +193,7 @@ public class TilerServiceRouter extends FatJarRouter {
                 // send auxiliary files to the .done directory when map tiling has finished
                 .process(exchange -> {
                     // assumes that satellite images either ends with .jpg or .tif
-                    // may have to changed in the future
+                    // may have to be changed in the future
                     String fileNameWithoutExtension = ((String) exchange.getIn().getHeader(Exchange.FILE_NAME))
                             .replace(".jpg", "").replace(".tif", "");
                     File path = new File(localDir);

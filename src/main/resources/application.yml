@@ -13,6 +13,8 @@ tracing: true
 
 mapTiler.arguments:
 
+tiles.server.port: 8080
+
 ---
 spring:
   profiles: unittest
