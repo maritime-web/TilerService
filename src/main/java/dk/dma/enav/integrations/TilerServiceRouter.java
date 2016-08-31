@@ -24,6 +24,7 @@ import com.spotify.docker.client.exceptions.DockerException;
 import com.spotify.docker.client.messages.ContainerConfig;
 import com.spotify.docker.client.messages.ContainerCreation;
 import com.spotify.docker.client.messages.HostConfig;
+import com.spotify.docker.client.messages.PortBinding;
 import org.apache.camel.Exchange;
 import org.apache.camel.PropertyInject;
 import org.apache.camel.component.file.GenericFileFilter;
@@ -36,13 +37,9 @@ import org.springframework.context.annotation.Bean;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -64,6 +61,9 @@ public class TilerServiceRouter extends FatJarRouter {
 
     @PropertyInject("mapTiler.arguments")
     private String mapTilerArguments;
+
+    @PropertyInject("tiles.server.port")
+    private String tileServerPort;
 
     @PropertyInject("tiles.daysToKeep")
     private int daysToKeep;
@@ -88,6 +88,44 @@ public class TilerServiceRouter extends FatJarRouter {
                         exchange.getIn().getHeader(Exchange.FILE_NAME_ONLY)));
         // split the specified arguments for the MapTiler container
         String[] mapTilerArgs = mapTilerArguments.split(" ");
+
+        // create a container for tile server
+        Map<String, List<PortBinding>> portBindings = new HashMap<>();
+        List<PortBinding> hostPorts = new ArrayList<>();
+        hostPorts.add(PortBinding.of("", tileServerPort));
+        portBindings.put("80", hostPorts);
+        ContainerConfig tileServerConfig = ContainerConfig.builder()
+                .hostConfig(HostConfig.builder().appendBinds(String.format("%s:/var/www", hostDir + "/tiles"))
+                        .portBindings(portBindings).build())
+                .image("klokantech/tileserver-php").exposedPorts("80")
+                .build();
+        ContainerCreation tileServer = docker.createContainer(tileServerConfig);
+        log.info("Starting tile server");
+        String tileServerID = tileServer.id();
+        docker.startContainer(tileServerID);
+
+        // handle shutdown of tile server container on graceful shutdown
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                log.info("Stopping tile server");
+                try {
+                    docker.stopContainer(tileServerID, 300);
+                    int exitCode = docker.waitContainer(tileServerID).statusCode();
+                    if (exitCode != 0) {
+                        log.error("Something went wrong when shutting down tile server");
+                        log.error(docker.logs(tileServerID, DockerClient.LogsParam.stderr(),
+                                DockerClient.LogsParam.stdout()).readFully());
+                    } else {
+                        docker.removeContainer(tileServerID);
+                    }
+                } catch (DockerException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
 
         // fetch satellite images from provider and save them in a local directory
         from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
@@ -137,12 +175,14 @@ public class TilerServiceRouter extends FatJarRouter {
                         docker.removeContainer(containerID);
                     } else {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
+                        log.error(docker.logs(containerID, DockerClient.LogsParam.stderr(),
+                                DockerClient.LogsParam.stdout()).readFully());
                     }
                 })
                 // send auxiliary files to the .done directory when map tiling has finished
                 .process(exchange -> {
                     // assumes that satellite images either ends with .jpg or .tif
-                    // may have to changed in the future
+                    // may have to be changed in the future
                     String fileNameWithoutExtension = ((String) exchange.getIn().getHeader(Exchange.FILE_NAME))
                             .replace(".jpg", "").replace(".tif", "");
                     File path = new File(localDir);

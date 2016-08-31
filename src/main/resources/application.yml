@@ -13,6 +13,8 @@ tracing: true
 
 tiles.localDirectory: /data/tiles
 
+tiles.server.port: 8080
+
 ---
 spring:
   profiles: unittest

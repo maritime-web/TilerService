@@ -1,6 +1,7 @@
 # TilerService
 
-Integration point responsible for fetching satellite images and sending them to a Docker container running MapTiler Pro.
+Integration point responsible for fetching satellite images and sending them to a Docker container running [MapTiler Pro](https://hub.docker.com/r/klokantech/maptiler/).
+The tiled images are server by a [tile server](https://hub.docker.com/r/klokantech/tileserver-php/) also running in a Docker container.
 
 ## Prerequisites
 
@@ -29,9 +30,13 @@ It must at least contain these lines:
     tiles.localDirectory = <where you want to store satellite images fetched from ftp server>
     
 ## Execution
+Before you can run the program you must do the following:
+
+    docker pull dmadk/permissions-fixer
+    docker pull klokantech/maptiler
+    docker pull klokantech/tileserver-php
 
 To run the program you can use Maven and Spring Boot:
 
     mvn spring-boot:run
-    
-A Docker based setup is also on the way.
+
