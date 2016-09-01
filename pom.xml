@@ -93,6 +93,13 @@
             <version>2.5</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.jolokia</groupId>
+            <artifactId>jolokia-spring</artifactId>
+            <classifier>plugin</classifier>
+            <version>1.1.0</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
