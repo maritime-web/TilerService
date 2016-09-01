@@ -111,6 +111,8 @@ public class TilerServiceRouter extends FatJarRouter {
                     int exitCode = docker.waitContainer(tileServerID).statusCode();
                     if (exitCode != 0) {
                         log.error("Something went wrong when shutting down tile server");
+                        log.error(docker.logs(tileServerID, DockerClient.LogsParam.stderr(),
+                                DockerClient.LogsParam.stdout()).readFully());
                     } else {
                         docker.removeContainer(tileServerID);
                     }
@@ -188,6 +190,8 @@ public class TilerServiceRouter extends FatJarRouter {
                         }
                     } else {
                         log.error("Tiling failed for " + fileName + " in container " + containerID);
+                        log.error(docker.logs(containerID, DockerClient.LogsParam.stderr(),
+                                DockerClient.LogsParam.stdout()).readFully());
                     }
                 })
                 // send auxiliary files to the .done directory when map tiling has finished
