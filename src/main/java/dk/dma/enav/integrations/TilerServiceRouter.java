@@ -241,25 +241,6 @@ public class TilerServiceRouter extends FatJarRouter {
         };
     }
 
-    // filter for files that are too old on FTP server
-    @Bean
-    GenericFileFilter tooOldOnFTP() {
-        return file -> {
-            if (daysToKeepOnServer <= 0) return false;
-            else {
-                long fileLastModified = file.getLastModified();
-
-                // the difference in milliseconds for the time now
-                // and the time that the file was last modified
-                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
-                // converts the difference to days
-                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
-
-                return days > daysToKeepOnServer;
-            }
-        };
-    }
-
     // deletes tiles and images that are older than the specified threshold
     private void deleteOldTilesAndImages() throws IOException {
         if (daysToKeep < 0) {
