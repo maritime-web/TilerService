@@ -251,6 +251,11 @@ public class TilerServiceRouter extends FatJarRouter {
 
             // get all directories that are older than daysToKeep
             FileFilter filter = file -> {
+                // do not delete files for Tile Server
+                if (file.getName().equals("README.md") || file.getName().equals("tileserver.php")) {
+                    return false;
+                }
+
                 long fileLastModified = file.lastModified();
 
                 long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
