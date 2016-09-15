@@ -66,12 +66,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.camel</groupId>
-            <artifactId>camel-ftp</artifactId>
-            <version>${apache.camel-version}</version>
-        </dependency>
-
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
@@ -111,13 +105,6 @@
             <groupId>org.apache.camel</groupId>
             <artifactId>camel-test</artifactId>
             <version>${apache.camel-version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.mockftpserver</groupId>
-            <artifactId>MockFtpServer</artifactId>
-            <version>2.6</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

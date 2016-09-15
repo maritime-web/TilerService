@@ -68,9 +68,6 @@ public class TilerServiceRouter extends FatJarRouter {
     @PropertyInject("tiles.daysToKeep")
     private int daysToKeep;
 
-    @PropertyInject("dmi.daysToKeep")
-    private int daysToKeepOnServer;
-
     @PropertyInject("tracing")
     private boolean tracing;
 
@@ -127,11 +124,25 @@ public class TilerServiceRouter extends FatJarRouter {
             }
         });
 
-        // fetch satellite images from provider and save them in a local directory
-        from("ftp://{{dmi.user}}@{{dmi.server}}/{{dmi.directory}}?password={{dmi.password}}&passiveMode=true" +
-                "&localWorkDirectory=/tmp&idempotent=true&consumer.bridgeErrorHandler=true&binary=true&delay=15m" +
-                "&filter=#notTooOld")
-                .to("file://{{tiles.localDirectory}}?fileExist=Ignore");
+        from("timer:consumer?fixedRate=true&period=12h")
+                .process(exchange -> {
+                    ContainerConfig consumerConfig = ContainerConfig.builder()
+                            .hostConfig(HostConfig.builder().appendBinds(hostDir + ":/data").build())
+                            .image("dmadk/satellite-consumer").build();
+
+                    ContainerCreation consumer = docker.createContainer(consumerConfig);
+                    String consumerID = consumer.id();
+
+                    docker.startContainer(consumerID);
+                    int exitCode = docker.waitContainer(consumerID).statusCode();
+
+                    if (exitCode != 0) {
+                        log.error("Consuming of satellite images failed");
+                        log.error(docker.logs(consumerID).readFully());
+                    } else {
+                        docker.removeContainer(consumerID);
+                    }
+                });
 
         // send local satellite images to a MapTiler running in a Docker container
         from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true" +
@@ -184,8 +195,9 @@ public class TilerServiceRouter extends FatJarRouter {
                     File path = new File(localDir);
                     File newPath = new File(path, ".done");
 
-                    File[] files = path.listFiles(file -> file.getName().contains(fileNameWithoutExtension) &&
-                            !file.equals(new File((String) exchange.getIn().getHeader(Exchange.FILE_PATH))));
+                    File[] files = path.listFiles(file -> file.getName().contains(fileNameWithoutExtension)
+                            && !file.getName().contains(".camelLock")
+                            && !file.equals(new File((String) exchange.getIn().getHeader(Exchange.FILE_PATH))));
 
                     for (File file : files) {
                         File newFile = new File(newPath, file.getName());
@@ -204,25 +216,6 @@ public class TilerServiceRouter extends FatJarRouter {
         return file -> {
             String fileName = file.getFileNameOnly();
             return (fileName.endsWith(".tif") || fileName.endsWith(".jpg"));
-        };
-    }
-
-    // filter for not consuming old files from ftp server
-    @Bean
-    GenericFileFilter notTooOld() {
-        return file -> {
-            if (daysToKeep < 0) return true;
-            else {
-                long fileLastModified = file.getLastModified();
-
-                // the difference in milliseconds for the time now
-                // and the time that the file was last modified
-                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
-                // converts the difference to days
-                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
-
-                return days <= daysToKeep;
-            }
         };
     }
 

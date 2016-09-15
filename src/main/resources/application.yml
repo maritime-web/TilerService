@@ -2,11 +2,6 @@ spring.main.sources: dk.dma.enav.integrations.TilerServiceRouter
 
 server.port: 9081
 
-# to be implemented later
-tiles.maxConcurrentJobs: 1
-
-dmi.daysToKeep: -1
-
 tiles.daysToKeep: -1
 
 tracing: true
@@ -18,16 +13,6 @@ tiles.server.port: 8080
 ---
 spring:
   profiles: unittest
-
-dmi.server: 127.0.0.1
-
-dmi.directory:
-
-dmi.user: user
-
-dmi.password: password
-
-dmi.daysToKeep: 60
 
 tiles.daysToKeep: 10
 
