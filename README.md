@@ -20,11 +20,6 @@ The tiled images are server by a [tile server](https://hub.docker.com/r/klokante
 The application.properties must be placed in src/main/java/dk.dma.enav.integrations/resources.
 It must at least contain these lines:
 
-    dmi.server = <ftp server address>
-    dmi.user = <ftp user>
-    dmi.password = <ftp password>
-    dmi.directory = <ftp directory>
-    
     mapTiler.license = <license for MapTiler Pro>
     
     tiles.localDirectory = <where you want to store satellite images fetched from ftp server>
@@ -33,6 +28,7 @@ It must at least contain these lines:
 Before you can run the program you must do the following:
 
     docker pull dmadk/permissions-fixer
+    docker pull dmadk/satellite-consumer
     docker pull klokantech/maptiler
     docker pull klokantech/tileserver-php
 
