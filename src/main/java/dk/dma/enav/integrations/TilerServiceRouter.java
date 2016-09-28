@@ -249,7 +249,7 @@ public class TilerServiceRouter extends FatJarRouter {
             File[] allToDelete = (File[]) ArrayUtils.addAll(tileSubPaths, doneFiles);
 
             for (File file : allToDelete) {
-                FileUtils.deleteDirectory(file);
+                FileUtils.deleteQuietly(file);
                 log.info("Old tiles and images deleter: " + file.getName() + " was deleted");
             }
         }
