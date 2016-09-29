@@ -228,7 +228,7 @@ public class TilerServiceRouter extends FatJarRouter {
             File donePath = new File(localDir + "/.done");
 
             // get all directories that are older than daysToKeep
-            FileFilter filter = file -> {
+            FileFilter tilesFilter = file -> {
                 // do not delete files for Tile Server
                 if (file.getName().equals("README.md") || file.getName().equals("tileserver.php")
                         || file.getName().equals(".htaccess") || file.getName().equals(".travis.yml")) {
@@ -241,11 +241,23 @@ public class TilerServiceRouter extends FatJarRouter {
                 // converts the difference to days
                 long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
 
+                // we want to keep stored tiles for 2 extra days before they are deleted
+                // in case somebody might need them
+                return days > (daysToKeep + 2);
+            };
+
+            FileFilter imageFilter = file -> {
+                long fileLastModified = file.lastModified();
+
+                long diff = Calendar.getInstance().getTimeInMillis() - fileLastModified;
+                // converts the difference to days
+                long days = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+
                 return days > daysToKeep;
             };
 
-            File[] tileSubPaths = tilesPath.listFiles(filter);
-            File[] doneFiles = donePath.listFiles(filter);
+            File[] tileSubPaths = tilesPath.listFiles(tilesFilter);
+            File[] doneFiles = donePath.listFiles(imageFilter);
             File[] allToDelete = (File[]) ArrayUtils.addAll(tileSubPaths, doneFiles);
 
             for (File file : allToDelete) {
