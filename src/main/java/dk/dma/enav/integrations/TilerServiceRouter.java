@@ -151,6 +151,12 @@ public class TilerServiceRouter extends FatJarRouter {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
                     String fileNameWithoutExtension = fileName.replace(".jpg", "").replace(".tif", "");
 
+                    File tileSet = new File(localDir + "/tiles/" + fileNameWithoutExtension);
+
+                    if (tileSet.exists()) {
+                        FileUtils.deleteQuietly(tileSet);
+                    }
+
                     // build a list of arguments for the MapTiler
                     ArrayList<String> arguments = new ArrayList<>();
                     arguments.add("maptiler");
