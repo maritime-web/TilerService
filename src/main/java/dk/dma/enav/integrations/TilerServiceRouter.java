@@ -117,9 +117,9 @@ public class TilerServiceRouter extends FatJarRouter {
                         docker.removeContainer(tileServerID);
                     }
                 } catch (DockerException e) {
-                    e.printStackTrace();
+                    log.error(e.toString());
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    log.error(e.toString());
                 }
             }
         });
@@ -128,7 +128,7 @@ public class TilerServiceRouter extends FatJarRouter {
                 .process(exchange -> {
                     ContainerConfig consumerConfig = ContainerConfig.builder()
                             .hostConfig(HostConfig.builder().appendBinds(hostDir + ":/data").build())
-                            .image("dmadk/satellite-consumer").build();
+                            .image("dmadk/satellite-consumer:latest").build();
 
                     ContainerCreation consumer = docker.createContainer(consumerConfig);
                     String consumerID = consumer.id();
@@ -142,19 +142,56 @@ public class TilerServiceRouter extends FatJarRouter {
                     } else {
                         docker.removeContainer(consumerID);
                     }
+                })
+                // for each consumed image check if it has already been tiled
+                .process(exchange -> {
+                    File imageDir = new File(localDir);
+                    File[] images = imageDir.listFiles();
+                    File donePath = new File(localDir + "/.done");
+                    for (File image : images) {
+                        File tiledImage = new File(localDir + "/tiles/" + image.getName());
+                        if (tiledImage.exists()) {
+                            Files.move(image.toPath(), donePath.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+                });
+
+        from("timer:latestConsumer?fixedRate=true&period=3h")
+                // Consume the latest satellite images
+                .process(exchange -> {
+                    ContainerConfig consumerConfig = ContainerConfig.builder()
+                            .hostConfig(HostConfig.builder().appendBinds(hostDir + ":/data").build())
+                            .image("dmadk/satellite-consumer:newest").build();
+
+                    ContainerCreation consumer = docker.createContainer(consumerConfig);
+                    String consumerID = consumer.id();
+
+                    docker.startContainer(consumerID);
+                    int exitCode = docker.waitContainer(consumerID).statusCode();
+
+                    if (exitCode != 0) {
+                        log.error("Consuming of latest satellite images failed");
+                        log.error(docker.logs(consumerID).readFully());
+                    } else {
+                        docker.removeContainer(consumerID);
+                    }
                 });
 
         // send local satellite images to a MapTiler running in a Docker container
         from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true" +
-                "&delay=15m&initialDelay=10000&move=.done")
+                "&delay=5m&initialDelay=10000&move=.done")
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
                     String fileNameWithoutExtension = fileName.replace(".jpg", "").replace(".tif", "");
 
                     File tileSet = new File(localDir + "/tiles/" + fileNameWithoutExtension);
 
+                    // if a tileset for the current image already exists then delete the tileset
                     if (tileSet.exists()) {
-                        FileUtils.deleteQuietly(tileSet);
+                        boolean deleted = FileUtils.deleteQuietly(tileSet);
+                        if (!deleted) {
+                            log.error(tileSet.getName() + " could not be deleted");
+                        }
                     }
 
                     // build a list of arguments for the MapTiler
@@ -211,7 +248,7 @@ public class TilerServiceRouter extends FatJarRouter {
                     }
                 });
 
-        // remove old tiles from the tiles directory
+        // delete old tiles and images
         from("timer:deleteOldFilesTimer?period=6h&fixedRate=true")
                 .process(exchange -> deleteOldTilesAndImages());
     }
@@ -267,8 +304,12 @@ public class TilerServiceRouter extends FatJarRouter {
             File[] allToDelete = (File[]) ArrayUtils.addAll(tileSubPaths, doneFiles);
 
             for (File file : allToDelete) {
-                FileUtils.deleteQuietly(file);
-                log.info("Old tiles and images deleter: " + file.getName() + " was deleted");
+                boolean deleted = FileUtils.deleteQuietly(file);
+                if (!deleted) {
+                    log.error("Old tiles and images deleter: " + file.getName() + " could not be deleted");
+                } else {
+                    log.info("Old tiles and images deleter: " + file.getName() + " was deleted");
+                }
             }
         }
     }

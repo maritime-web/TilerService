@@ -29,9 +29,8 @@ Before you can run the program you must do the following:
 
     docker pull klokantech/maptiler
     docker pull klokantech/tileserver-php
-    docker pull dmadk/satellite-consumer
+    docker pull dmadk/satellite-consumer:latest
+    docker pull dmadk/satellite-consumer:newest
 
-To run the program you can use Maven and Spring Boot:
-
-    mvn spring-boot:run
+The program should be executed as described at https://hub.docker.com/r/dmadk/tiler-service/ 
 
