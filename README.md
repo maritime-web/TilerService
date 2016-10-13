@@ -36,4 +36,4 @@ To run the program you can use Maven and Spring Boot:
 
     mvn spring-boot:run
     
-A Docker based setup is also on the way.
+You can also use the Docker based setup, which is the recommended choice of execution as it is generally more up to date. Instructions for the Docker based setup can be found at https://hub.docker.com/r/dmadk/tiler-service/
