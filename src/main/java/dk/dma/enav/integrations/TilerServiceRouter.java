@@ -179,7 +179,7 @@ public class TilerServiceRouter extends FatJarRouter {
 
         // send local satellite images to a MapTiler running in a Docker container
         from("file://{{tiles.localDirectory}}?filter=#correctExtension&consumer.bridgeErrorHandler=true" +
-                "&delay=5m&initialDelay=10000&move=.done")
+                "&delay=5m&initialDelay=10000&move=.done&readLock=changed")
                 .process(exchange -> {
                     String fileName = (String) exchange.getIn().getHeader(Exchange.FILE_NAME);
                     String fileNameWithoutExtension = fileName.replace(".jpg", "").replace(".tif", "");
