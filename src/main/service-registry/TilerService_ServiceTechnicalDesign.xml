@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ServiceDesignSchema:serviceDesign
+        xmlns:ServiceDesignSchema="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceDesignSchema.xsd"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceDesignSchema.xsd ServiceDesignSchema.xsd ">
+   <name>Satellite Tiles Service</name>
+   <id>urn:mrn:mcl:service:technical:dma:tiles-service</id>
+   <version>0.2</version>
+   <status>provisional</status>
+   <description>Serving satelite images using XYZ requests</description>
+
+    <designsServiceSpecifications>
+        <designsServiceSpecifications>
+            <id>urn:mrn:mcl:service:specification:dma:tiles-service</id>
+            <version>0.1</version>
+        </designsServiceSpecifications>
+    </designsServiceSpecifications>
+
+   <offersTransport>
+     <offersTransport>
+       <name>REST</name>
+       <description>The service is available as REST over HTTP</description>
+       <protocol>HTTP</protocol>
+     </offersTransport>
+   </offersTransport>
+
+   <designedBy>
+       <id>urn:mrn:mcl:user:dma:osh</id>
+       <name>Oliver Steensen-Bech Haagh</name>
+       <description>Student Worker at DMA</description>
+       <contactInfo>osh@dma.dk</contactInfo>
+   </designedBy>
+
+   <servicePhysicalDataModel>
+       <name>Satellite TileServer model</name>
+       <description>Direct access to tiles with XYZ tile requests</description>
+       <model>
+           Based on http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames with the following addition.
+
+           # A date placeholder is introduced to the XYZ URL.
+             The format of the date is one of
+                 1. YYYYDayOfYear e.g. 20161 meaning the first day of the year 2016.
+                 2. latest meaning the newest tile on the server.
+
+           Example request url: http://satellite-tiles.example.com./BalticSea.{date}.aqua.250m/{z}/{x}/{y}.png
+       </model>
+       <modelType>Reference to doc</modelType>
+   </servicePhysicalDataModel>
+</ServiceDesignSchema:serviceDesign>

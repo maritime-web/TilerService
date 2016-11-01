@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ServiceSpecificationSchema:serviceSpecification
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:ServiceSpecificationSchema="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceSpecificationSchema.xsd"
+        xsi:schemaLocation="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceSpecificationSchema.xsd ServiceSpecificationSchema.xsd ">
+    <name>Satellite Tiles Service</name>
+    <status>provisional</status>
+    <id>urn:mrn:mcl:service:specification:dma:tiles-service</id>
+    <version>0.1</version>
+    <description></description>
+
+    <keywords></keywords>
+    <isSpatialExclusive>false</isSpatialExclusive>
+
+    <authorInfos>
+        <authorInfo>
+            <id>urn:mrn:mcl:user:dma:osh</id>
+            <name>Oliver Steensen-Bech Haagh</name>
+            <description>Student Worker responsible at DMA</description>
+            <contactInfo>osh@dma.dk</contactInfo>
+        </authorInfo>
+    </authorInfos>
+
+    <serviceInterfaces>
+        <serviceInterface>
+            <name>TileServer</name>
+            <description>Works according to the request response pattern.</description>
+            <dataExchangePattern>REQUEST_RESPONSE</dataExchangePattern>
+            <operations>
+                <operation>
+                    <name>Get tiles</name>
+                    <description>Retrieve satelite images</description>
+                    <parameterTypes>
+                        <parameterType>
+                            <typeReference>request</typeReference>
+                        </parameterType>
+                    </parameterTypes>
+                    <returnValueType>
+                        <typeReference>response</typeReference>
+                    </returnValueType>
+                </operation>
+            </operations>
+        </serviceInterface>
+    </serviceInterfaces>
+
+    <requirements>
+        <requirement>
+            <id>1.</id>
+            <name>Req 1.</name>
+            <text>Provide satelite images of various areas</text>
+            <rationale>Allow mariners to assess if a particular area contains ice</rationale>
+        </requirement>
+    </requirements>
+
+    <serviceDataModel>
+        <definitionAsXSD>
+            <schema xmlns="http://www.w3.org/2001/XMLSchema"
+                    xmlns:tns="http://dma.dk/service/specification/logical/model"
+                    targetNamespace="http://dma.dk/service/specification/logical/model">
+                <element name="request" type="tns:Request" />
+                <element name="response" type="tns:Response" />
+
+                <complexType name="Request">
+                    <sequence>
+                        <element name="x" type="int" />
+                        <element name="y" type="int" />
+                        <element name="z" type="int" />
+                        <element name="year" type="gYear" />
+                        <element name="dayOfYear" type="int" />
+                    </sequence>
+                </complexType>
+                <complexType name="Response">
+                    <sequence>
+                        <element name="tile" type="base64Binary" />
+                    </sequence>
+                    <attribute name="mediaType" fixed="image/png" />
+                </complexType>
+            </schema>
+        </definitionAsXSD>
+    </serviceDataModel>
+</ServiceSpecificationSchema:serviceSpecification>
