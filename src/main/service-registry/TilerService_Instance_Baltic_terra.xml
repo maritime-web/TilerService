@@ -5,11 +5,11 @@
         xsi:schemaLocation="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceInstanceSchema.xsd ServiceInstanceSchema.xsd "
 >
   <name>Terra Baltic Satellite tiles service</name>
-  <id>urn:mrnx:mcl:service:instance:dma:tiles-service:terra:baltic</id>
+  <id>urn:mrn:mcl:service:instance:dma:tiles-service:terra:baltic</id>
   <version>0.1</version>
   <status>provisional</status>
-  <description>Tiles service instance serving satelite images from the NASA terra satelite covering the baltic sea area</description>
-  <keywords>Tile Satelite terra NASA XYZ</keywords>
+  <description>Tiles service instance serving satellite images from the NASA terra satellite covering the baltic sea area</description>
+  <keywords>Tile Satellite terra NASA XYZ</keywords>
   <URL>http://satellite.e-navigation.net:8080/BalticSea.{date}.terra.250m/{z}/{x}/{y}.png</URL>
   <requiresAuthorization>true</requiresAuthorization>
 

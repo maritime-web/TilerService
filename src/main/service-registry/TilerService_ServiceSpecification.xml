@@ -7,9 +7,9 @@
     <status>provisional</status>
     <id>urn:mrn:mcl:service:specification:dma:tiles-service</id>
     <version>0.1</version>
-    <description></description>
+    <description>Provide easy access to satellite images for web clients</description>
 
-    <keywords></keywords>
+    <keywords>satellite images ice XYZ</keywords>
     <isSpatialExclusive>false</isSpatialExclusive>
 
     <authorInfos>
@@ -29,7 +29,7 @@
             <operations>
                 <operation>
                     <name>Get tiles</name>
-                    <description>Retrieve satelite images</description>
+                    <description>Retrieve satellite images</description>
                     <parameterTypes>
                         <parameterType>
                             <typeReference>request</typeReference>
@@ -47,7 +47,7 @@
         <requirement>
             <id>1.</id>
             <name>Req 1.</name>
-            <text>Provide satelite images of various areas</text>
+            <text>Provide satellite images of various areas</text>
             <rationale>Allow mariners to assess if a particular area contains ice</rationale>
         </requirement>
     </requirements>

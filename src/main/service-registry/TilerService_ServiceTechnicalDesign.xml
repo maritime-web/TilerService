@@ -3,11 +3,11 @@
         xmlns:ServiceDesignSchema="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceDesignSchema.xsd"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceDesignSchema.xsd ServiceDesignSchema.xsd ">
-   <name>Satellite Tiles Service</name>
+   <name>Satellite Tiles Service Design</name>
    <id>urn:mrn:mcl:service:technical:dma:tiles-service</id>
    <version>0.2</version>
    <status>provisional</status>
-   <description>Serving satelite images using XYZ requests</description>
+   <description>Serving satellite images using XYZ requests</description>
 
     <designsServiceSpecifications>
         <designsServiceSpecifications>

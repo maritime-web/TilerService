@@ -5,12 +5,12 @@
         xsi:schemaLocation="http://efficiensea2.org/maritime-cloud/service-registry/v1/ServiceInstanceSchema.xsd ServiceInstanceSchema.xsd "
 >
   <name>Aqua Baltic Satellite tiles service</name>
-  <id>urn:mrnx:mcl:service:instance:dma:tiles-service:aqua:baltic</id>
+  <id>urn:mrn:mcl:service:instance:dma:tiles-service:aqua:baltic</id>
   <version>0.1</version>
   <status>provisional</status>
-  <description>Tiles service instance serving satelite images from the NASA aqua satelite covering the baltic sea area</description>
-  <keywords>Tile Satelite aqua NASA XYZ</keywords>
-  <URL>http://satellite.e-navigation.net:8080/BalticSea.{date}.aqua.250m/{z}/{x}/{y}.png</URL>
+  <description>Tiles service instance serving satellite images from the NASA aqua satellite covering the baltic sea area</description>
+  <keywords>Tile Satellite aqua NASA XYZ</keywords>
+  <URL>http://satellite.e-navigation.net:8080/BalticSea.{date}.aqua.500m/{z}/{x}/{y}.png</URL>
   <requiresAuthorization>true</requiresAuthorization>
 
   <implementsServiceDesign>
