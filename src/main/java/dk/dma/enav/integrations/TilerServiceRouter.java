@@ -274,7 +274,8 @@ public class TilerServiceRouter extends FatJarRouter {
             FileFilter tilesFilter = file -> {
                 // do not delete files for Tile Server
                 if (file.getName().equals("README.md") || file.getName().equals("tileserver.php")
-                        || file.getName().equals(".htaccess") || file.getName().equals(".travis.yml")) {
+                        || file.getName().equals(".htaccess") || file.getName().equals(".travis.yml")
+                        || file.getName().equals("robots.txt")) {
                     return false;
                 }
 
