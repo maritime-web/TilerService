@@ -77,6 +77,11 @@ public class TilerServiceRouter extends FatJarRouter {
     @Override
     public void configure() throws DockerException, InterruptedException {
         log.info("" + docker.info());
+        log.info("Pulling newest docker images");
+        docker.pull("dmadk/satellite-consumer:latest");
+        docker.pull("dmadk/satellite-consumer:newest");
+        docker.pull("klokantech/maptiler");
+        docker.pull("klokantech/tileserver-php");
         // set true for detailed tracing of routes
         this.getContext().setTracing(tracing);
         this.onException(Exception.class)
@@ -102,27 +107,24 @@ public class TilerServiceRouter extends FatJarRouter {
         docker.startContainer(tileServerID);
 
         // handle shutdown of tile server container on graceful shutdown
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            @Override
-            public void run() {
-                log.info("Stopping tile server");
-                try {
-                    docker.stopContainer(tileServerID, 300);
-                    int exitCode = docker.waitContainer(tileServerID).statusCode();
-                    if (exitCode != 0) {
-                        log.error("Something went wrong when shutting down tile server");
-                        log.error(docker.logs(tileServerID, DockerClient.LogsParam.stderr(),
-                                DockerClient.LogsParam.stdout()).readFully());
-                    } else {
-                        docker.removeContainer(tileServerID);
-                    }
-                } catch (DockerException e) {
-                    log.error(e.toString());
-                } catch (InterruptedException e) {
-                    log.error(e.toString());
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.info("Stopping tile server");
+            try {
+                docker.stopContainer(tileServerID, 300);
+                int exitCode = docker.waitContainer(tileServerID).statusCode();
+                if (exitCode != 0) {
+                    log.error("Something went wrong when shutting down tile server");
+                    log.error(docker.logs(tileServerID, DockerClient.LogsParam.stderr(),
+                            DockerClient.LogsParam.stdout()).readFully());
+                } else {
+                    docker.removeContainer(tileServerID);
                 }
+            } catch (DockerException e) {
+                log.error(e.toString());
+            } catch (InterruptedException e) {
+                log.error(e.toString());
             }
-        });
+        }));
 
         from("timer:consumer?fixedRate=true&period=12h")
                 .process(exchange -> {
