@@ -74,6 +74,13 @@ public class TilerServiceRouter extends FatJarRouter {
     @Override
     public void configure() throws DockerException, InterruptedException {
         log.info("" + docker.info());
+        log.info("Pulling newest docker images");
+        docker.pull("dmadk/permissions-fixer");
+        docker.pull("dmadk/satellite-consumer:latest");
+        docker.pull("dmadk/satellite-consumer:newest");
+        docker.pull("klokantech/maptiler");
+        docker.pull("klokantech/tileserver-php");
+
         // set true for detailed tracing of routes
         this.getContext().setTracing(tracing);
         this.onException(Exception.class)
