@@ -27,7 +27,7 @@ pipeline {
 
     post {
         success {
-            sh "curl -H \"Content-Type: application/json\" --data \'{"build": true}\' -X POST https://registry.hub.docker.com/u/dmadk/tiler-service/trigger/da192d9c-854f-43b0-acfb-d19ec80cedc6/"
+            sh 'curl -H "Content-Type: application/json" --data "{build: true}" -X POST https://registry.hub.docker.com/u/dmadk/tiler-service/trigger/da192d9c-854f-43b0-acfb-d19ec80cedc6/'
         }
     }
 }
