@@ -112,7 +112,7 @@ public class TilerServiceRouter extends FatJarRouter {
                 log.info("Stopping tile server");
                 try {
                     docker.stopContainer(tileServerID, 300);
-                    int exitCode = docker.waitContainer(tileServerID).statusCode();
+                    long exitCode = docker.waitContainer(tileServerID).statusCode();
                     if (exitCode != 0) {
                         log.error("Something went wrong when shutting down tile server");
                         log.error(docker.logs(tileServerID, DockerClient.LogsParam.stderr(),
@@ -138,7 +138,7 @@ public class TilerServiceRouter extends FatJarRouter {
                     String consumerID = consumer.id();
 
                     docker.startContainer(consumerID);
-                    int exitCode = docker.waitContainer(consumerID).statusCode();
+                    long exitCode = docker.waitContainer(consumerID).statusCode();
 
                     if (exitCode != 0) {
                         log.error("Consuming of satellite images failed");
@@ -171,7 +171,7 @@ public class TilerServiceRouter extends FatJarRouter {
                     String consumerID = consumer.id();
 
                     docker.startContainer(consumerID);
-                    int exitCode = docker.waitContainer(consumerID).statusCode();
+                    long exitCode = docker.waitContainer(consumerID).statusCode();
 
                     if (exitCode != 0) {
                         log.error("Consuming of latest satellite images failed");
@@ -212,7 +212,7 @@ public class TilerServiceRouter extends FatJarRouter {
                     docker.startContainer(containerID);
 
                     // get the exit code when the container finishes and check if the tiling job was successful or not
-                    int exitCode = docker.waitContainer(containerID).statusCode();
+                    long exitCode = docker.waitContainer(containerID).statusCode();
 
                     if (exitCode == 0) {
                         log.info("Tiling completed for " + fileName);
@@ -228,7 +228,7 @@ public class TilerServiceRouter extends FatJarRouter {
                         String fixerID = fixer.id();
                         docker.startContainer(fixerID);
 
-                        int fixerExitCode = docker.waitContainer(fixerID).statusCode();
+                        long fixerExitCode = docker.waitContainer(fixerID).statusCode();
 
                         if (fixerExitCode != 0) {
                             log.error("Setting permissions for " + fileNameWithoutExtension + " failed");
