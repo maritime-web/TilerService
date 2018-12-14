@@ -13,7 +13,7 @@ pipeline {
         stage('build') {
             steps {
                 withMaven(options: [junitPublisher(ignoreAttachments: false), artifactsPublisher()]) {
-                    sh 'mvn -e -DskipTests install'
+                    sh 'mvn -e install'
                 }
             }
             post {
